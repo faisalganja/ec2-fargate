@@ -3,7 +3,8 @@ pipeline {
 
     environment {
         AWS_DEFAULT_REGION = 'us-east-1'
-        AWS_REGION = 'us-east-1'
+        AWS_ACCESS_KEY_ID = credentials('aws-dev')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-dev')
     }
 
     stages {
@@ -17,9 +18,11 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                withAWS(credentials: 'aws-dev', region: 'us-east-1') {
-                    sh 'cd scripts && chmod +x deploy.sh && ./deploy.sh'
-                }
+                sh '''
+                    cd scripts
+                    chmod +x deploy.sh
+                    ./deploy.sh
+                '''
             }
         }
     }
