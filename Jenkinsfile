@@ -12,7 +12,7 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                sh 'chmod +x deploy.sh && ./deploy.sh'
+                sh 'cd scripts && chmod +x deploy.sh && ./deploy.sh'
             }
         }
     }
