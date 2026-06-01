@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    environment {
+        AWS_DEFAULT_REGION = 'us-east-1'
+        AWS_REGION = 'us-east-1'
+    }
+
     stages {
         stage('Checkout') {
             steps {
@@ -12,7 +17,7 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                sh 'chmod +x deploy.sh && ./deploy.sh'
+                sh 'cd scripts && chmod +x deploy.sh && ./deploy.sh'
             }
         }
     }
