@@ -17,7 +17,9 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                sh 'cd scripts && chmod +x deploy.sh && ./deploy.sh'
+                withAWS(credentials: 'aws-dev', region: 'us-east-1') {
+                    sh 'cd scripts && chmod +x deploy.sh && ./deploy.sh'
+                }
             }
         }
     }
