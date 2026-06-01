@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "CFN ECS Main Driver"
+
+Parameters:
+  awsEnv:
+    Type: String
+    Default: dev
+  appCode:    
+    Type: String
+    Default: jenkins-test
+  vpcCode:
+    Type: String
+    Default: project
+  s3ArtifactPath:
+    Type: String
+    Default: ec2-fargate/cloudformation
+
+Resources:
+  ecsCluster:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${s3ArtifactPath}/ecs-cluster.yml"
+      Parameters:
+        awsEnv: !Ref awsEnv
+        appCode: !Ref appCode
+        vpcCode: !Ref vpcCode
+        ecsSecurityGroups: !Ref SecurityGroupId
+        ecsSubnets: !Ref SubnetIds
+        ecsDesiredCount: 1
+        ecsMaxCapacity: 2
+        ecsEc2InstanceType: t2.micro
+        ecsEc2Role: !Sub "arn:aws:iam::${AWS::AccountId}:instance-profile/ecsInstanceRole"
+
+Parameters:
+  SecurityGroupId:
+    Type: String
+    Default: sg-058edc7c938d1cde0
+  SubnetIds:
+    Type: String
+    Default: subnet-07ad08c764de99943
+
+Outputs:
+  ECSClusterName:
+    Value: !GetAtt ecsCluster.Outputs.ecsCluster
+    Export:
+      Name: !Sub "${appCode}-${awsEnv}-cluster-name"

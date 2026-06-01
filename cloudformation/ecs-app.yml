@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS EC2 Application - Task Definition and Service'
+
+Parameters:
+  awsEnv:
+    Type: String
+    Default: dev
+  appCode:
+    Type: String
+    Default: myapp
+  vpcCode:
+    Type: String
+    Default: main
+  appName:
+    Type: String
+    Default: simple-app
+  ecsDesiredCount:
+    Type: Number
+    Default: 2
+  ecsContainerPort:
+    Type: Number
+    Default: 80
+  ecsImage:
+    Type: String
+    Description: "Docker image URI (e.g., nginx:latest or ECR image)"
+    Default: nginx:alpine
+  ecsTaskRoleArn:
+    Type: String
+    Default: ""
+  ecsExecutionRoleArn:
+    Type: String
+    Default: ""
+
+Resources:
+  # Task Definition for EC2 (uses bridge network mode)
+  ecsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${appCode}-${appName}-${awsEnv}"
+      NetworkMode: bridge
+      RequiresCompatibilities:
+        - EC2
+      Cpu: "256"
+      Memory: "512"
+      ExecutionRoleArn: !If
+        - HasExecutionRole
+        - !Ref ecsExecutionRoleArn
+        - !Ref AWS::NoValue
+      TaskRoleArn: !If
+        - HasTaskRole
+        - !Ref ecsTaskRoleArn
+        - !Ref AWS::NoValue
+      ContainerDefinitions:
+        - Name: !Sub "${appCode}-${appName}-container"
+          Image: !Ref ecsImage
+          Essential: true
+          Memory: 512
+          Cpu: 256
+          PortMappings:
+            - ContainerPort: !Ref ecsContainerPort
+              HostPort: 0
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ecsLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+
+  # ECS Service
+  ecsService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${appCode}-${appName}-service-${awsEnv}"
+      Cluster:
+        Fn::ImportValue: !Sub "${appCode}-ecs-cluster-${awsEnv}"
+      TaskDefinition: !Ref ecsTaskDefinition
+      DesiredCount: !Ref ecsDesiredCount
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 50
+      SchedulingStrategy: REPLICA
+      # For EC2, we don't specify network configuration - it uses host networking
+
+  # CloudWatch Log Group
+  ecsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${appCode}-${appName}-${awsEnv}"
+      RetentionInDays: 7
+
+Conditions:
+  HasTaskRole: !Not [!Equals [!Ref ecsTaskRoleArn, ""]]
+  HasExecutionRole: !Not [!Equals [!Ref ecsExecutionRoleArn, ""]]
+
+Outputs:
+  TaskDefinitionArn:
+    Value: !Ref ecsTaskDefinition
+    Export:
+      Name: !Sub "${appCode}-${appName}-taskdef-${awsEnv}"
+  ServiceName:
+    Value: !Ref ecsService
+    Export:
+      Name: !Sub "${appCode}-${appName}-service-${awsEnv}"
+  LogGroupName:
+    Value: !Ref ecsLogGroup
+    Export:
+      Name: !Sub "${appCode}-${appName}-logs-${awsEnv}"

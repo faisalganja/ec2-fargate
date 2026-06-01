@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS EC2 Cluster CFN Template'
+
+Parameters:
+  awsEnv:
+    Type: String
+  appCode:
+    Type: String
+  vpcCode:
+    Type: String
+  ecsSubnets:
+    Type: String
+  ecsSecurityGroups:
+    Type: String
+  ecsEc2Role:
+    Type: String
+  ecsDesiredCount:
+    Type: String
+  ecsMaxCapacity:
+    Type: String
+  ecsEc2InstanceType:
+    Type: String
+
+Resources:
+  ecsCluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: !Sub "${appCode}-ecs-cluster-${awsEnv}"
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+
+  ecsAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: !Split [",", !Ref ecsSubnets]
+      LaunchTemplate:
+        LaunchTemplateId: !Ref ecsLaunchTemplate
+        Version: !GetAtt ecsLaunchTemplate.LatestVersionNumber
+      MinSize: '1'
+      MaxSize: !Ref ecsMaxCapacity
+      DesiredCapacity: !Ref ecsDesiredCount
+      Tags:
+        - Key: Name
+          Value: !Sub "${appCode}-ecs-instance-${awsEnv}"
+          PropagateAtLaunch: true
+
+  ecsLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "${appCode}-ecs-lt-${awsEnv}"
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Name: !Ref ecsEc2Role
+        ImageId: ami-0c7217cdde317cfec
+        InstanceType: !Ref ecsEc2InstanceType
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            echo ECS_CLUSTER=${ecsCluster} >> /etc/ecs/ecs.config
+            start ecs
+
+Outputs:
+  ecsCluster:
+    Value: !Ref ecsCluster
+    Export:
+      Name: !Sub "${appCode}-ecs-cluster-${awsEnv}"
