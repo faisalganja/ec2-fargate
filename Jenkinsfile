@@ -3,8 +3,6 @@ pipeline {
 
     environment {
         AWS_DEFAULT_REGION = 'us-east-1'
-        AWS_ACCESS_KEY_ID = credentials('aws-dev')
-        AWS_SECRET_ACCESS_KEY = credentials('aws-dev')
     }
 
     stages {
@@ -16,13 +14,28 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy Task to ECS') {
             steps {
-                sh '''
-                    cd scripts
-                    chmod +x deploy.sh
-                    ./deploy.sh
-                '''
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-dev']]) {
+                    sh '''
+                        cd scripts
+                        chmod +x deploy.sh
+                        ./deploy.sh
+                    '''
+                }
+            }
+        }
+
+        stage('Verify') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-dev']]) {
+                    sh '''
+                        echo "=== ECS Status ==="
+                        aws ecs list-tasks --cluster jenkins-test-ecs-cluster-dev
+                        aws ecs describe-clusters --clusters jenkins-test-ecs-cluster-dev \
+                            --query 'clusters[0].{runningTasks:runningTasksCount,pendingTasks:pendingTasksCount}'
+                    '''
+                }
             }
         }
     }

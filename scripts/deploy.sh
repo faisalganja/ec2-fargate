@@ -1,29 +1,76 @@
 #!/bin/bash
 
-set -e
-
+export AWS_DEFAULT_REGION="us-east-1"
 CLUSTER_NAME="jenkins-test-ecs-cluster-dev"
-SERVICE_NAME="jenkins-test-nginx-demo-service-dev"
 
-echo "=== ECS Deployment Status ==="
+echo "=== Registering Task Definition (No ECR needed) ==="
 
-# Check cluster
-echo "Cluster status:"
-aws ecs describe-clusters --clusters $CLUSTER_NAME
+# Register task definition with public Nginx from Docker Hub
+aws ecs register-task-definition \
+    --family nginx-public-task \
+    --network-mode bridge \
+    --container-definitions '[
+        {
+            "name": "nginx",
+            "image": "nginx:alpine",
+            "memory": 256,
+            "cpu": 128,
+            "essential": true,
+            "portMappings": [
+                {
+                    "containerPort": 80,
+                    "hostPort": 80,
+                    "protocol": "tcp"
+                }
+            ]
+        }
+    ]' \
+    --requires-compatibilities EC2
 
-# Check services
-echo "Service status:"
-aws ecs describe-services \
+echo "✅ Task definition registered: nginx-public-task"
+
+# Check if EC2 instance is registered with cluster
+CONTAINER_INSTANCE=$(aws ecs list-container-instances \
     --cluster $CLUSTER_NAME \
-    --services $SERVICE_NAME
+    --query 'containerInstanceArns[0]' \
+    --output text)
 
-# List running tasks
-echo "Running tasks:"
-aws ecs list-tasks --cluster $CLUSTER_NAME
+if [ "$CONTAINER_INSTANCE" != "None" ] && [ -n "$CONTAINER_INSTANCE" ]; then
+    echo "Found EC2 instance, running task..."
+    
+    # Run the task
+    TASK_ARN=$(aws ecs run-task \
+        --cluster $CLUSTER_NAME \
+        --task-definition nginx-public-task \
+        --count 1 \
+        --query 'tasks[0].taskArn' \
+        --output text)
+    
+    echo "✅ Task is running: $TASK_ARN"
+    
+    # Wait a few seconds for task to start
+    sleep 5
+    
+    # Get task details
+    echo ""
+    echo "=== Task Details ==="
+    aws ecs describe-tasks \
+        --cluster $CLUSTER_NAME \
+        --tasks $TASK_ARN \
+        --query 'tasks[0].{status:lastStatus,container:containers[0].name,image:containers[0].image}'
+    
+else
+    echo ""
+    echo "⚠️  No EC2 instances registered with ECS cluster"
+    echo ""
+    echo "To fix this, SSH to your EC2 instance and run:"
+    echo "================================================"
+    echo "sudo amazon-linux-extras install ecs -y"
+    echo "echo 'ECS_CLUSTER=$CLUSTER_NAME' | sudo tee -a /etc/ecs/ecs.config"
+    echo "sudo start ecs"
+    echo "sudo status ecs"
+    echo "================================================"
+fi
 
-# Check EC2 instance
-echo "EC2 instance status:"
-aws ec2 describe-instances --instance-ids i-061e5f495196bc411 \
-    --query 'Reservations[0].Instances[0].State.Name'
-
+echo ""
 echo "=== Deployment Complete ==="
