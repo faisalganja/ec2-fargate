@@ -1,0 +1,16 @@
+Parameters:
+  awsEnv:
+    Type: String
+  appCode:
+    Type: String
+  vpcCode:
+    Type: String
+
+Resources:
+  ecsCluster:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${s3ArtifactPath}/ecs-cluster.yml"
+      Parameters:
+        awsEnv: !Ref awsEnv
+        appCode: !Ref appCode

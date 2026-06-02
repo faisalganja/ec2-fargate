@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS Fargate Cluster - NO EC2 instances'
+
+Parameters:
+  awsEnv:
+    Type: String
+  appCode:
+    Type: String
+
+Resources:
+  ecsCluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: !Sub "${appCode}-ecs-cluster-${awsEnv}"  # ← KEEP SAME NAME
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+
+Outputs:
+  ecsCluster:
+    Value: !Ref ecsCluster
+    Export:
+      Name: !Sub "${appCode}-ecs-cluster-${awsEnv}"  # ← KEEP SAME EXPORT

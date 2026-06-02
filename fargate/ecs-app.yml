@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECS Fargate Application'
+
+Parameters:
+  awsEnv:
+    Type: String
+  appCode:
+    Type: String
+  vpcCode:
+    Type: String
+  appName:
+    Type: String
+
+Resources:
+  # NEW: IAM Role for Fargate (required!)
+  ecsTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  # CHANGED: Task definition for Fargate
+  ecsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${appCode}-${appName}-${awsEnv}"  # ← KEEP SAME NAME
+      NetworkMode: awsvpc           # ← CHANGED from 'bridge'
+      RequiresCompatibilities:       
+        - FARGATE                    # ← CHANGED from 'EC2'
+      Cpu: "256"                     # ← NEW (required for Fargate)
+      Memory: "512"                  # ← NEW (required for Fargate)
+      ExecutionRoleArn: !Ref ecsTaskExecutionRole  # ← NEW (required!)
+      ContainerDefinitions:
+        - Name: !Sub "${appCode}-${appName}-container"
+          Image: nginx:alpine
+          Essential: true
+          PortMappings:
+            - ContainerPort: 80
+              Protocol: tcp
+
+  # CHANGED: Service for Fargate
+  ecsService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${appCode}-${appName}-service-${awsEnv}"  # ← KEEP SAME NAME
+      Cluster: 
+        Fn::ImportValue: !Sub "${appCode}-ecs-cluster-${awsEnv}"  # ← SAME CLUSTER
+      TaskDefinition: !Ref ecsTaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE            # ← CHANGED from 'EC2'
+      NetworkConfiguration:          # ← NEW (required for Fargate)
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - Fn::ImportValue: !Sub "${appCode}-${vpcCode}-sg-ec2-${awsEnv}"
+          Subnets:
+            - Fn::ImportValue: !Sub "${appCode}-${vpcCode}-subnetPublic01-${awsEnv}"
+            - Fn::ImportValue: !Sub "${appCode}-${vpcCode}-subnetPublic02-${awsEnv}"
