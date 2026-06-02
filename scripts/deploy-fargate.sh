@@ -1,7 +1,7 @@
 #!/bin/bash
 # BEFORE (EC2)
 aws cloudformation deploy \
-    --template-file fargate/ecs-main.yml \
+    --template-file cloudformation/ecs-main.yml \
     --parameter-overrides \
         awsEnv=dev \
         appCode=myapp \

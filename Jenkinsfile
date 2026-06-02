@@ -19,8 +19,8 @@ pipeline {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-dev']]) {
                     sh '''
                         cd scripts
-                        chmod +x deploy.sh
-                        ./deploy.sh
+                        chmod +x deploy-fargate.sh
+                        ./deploy-fargate.sh
                     '''
                 }
             }
